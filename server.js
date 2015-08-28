@@ -68,7 +68,7 @@ server.backend = function(base_dir, socket_emitter) {
   (function() {
     var fireworm = require('fireworm');
     var server_path = path.join(base_dir, mineos.DIRS['servers']);
-    
+
     var fw = fireworm(server_path);
     fw.add('**/server.properties');
 
@@ -102,7 +102,7 @@ server.backend = function(base_dir, socket_emitter) {
     fw.add('**/*.tar');
     fw.add('**/*.tgz');
     fw.add('**/*.tar.gz');
-    
+
     fw
       .on('add', function(fp) {
         logging.info('[WEBUI] New file found in import directory', fp);
@@ -126,7 +126,7 @@ server.backend = function(base_dir, socket_emitter) {
             logging.error('[{0}] Aborted server startup; condition not met:'.format(server_name), err);
           else
             logging.info('[{0}] Server started. Waiting {1} ms...'.format(server_name, MS_TO_PAUSE));
-            
+
           setTimeout(callback, (err ? 1 : MS_TO_PAUSE));
         });
       },
@@ -158,11 +158,11 @@ server.backend = function(base_dir, socket_emitter) {
 
     var ip_address = socket.request.connection.remoteAddress;
     var username = socket.request.user.username;
-   
+
     var OWNER_CREDS = {
       uid: userid.uid(username),
       gid: userid.gid(username)
-    } 
+    }
 
     function webui_dispatcher (args) {
       logging.info('[WEBUI] Received emit command from {0}:{1}'.format(ip_address, username), args);
@@ -207,7 +207,7 @@ server.backend = function(base_dir, socket_emitter) {
               });
               break;
             }
-              
+
           break;
         case 'refresh_server_list':
           for (var s in self.servers)
@@ -313,7 +313,7 @@ server.backend = function(base_dir, socket_emitter) {
           });
 
           self.front_end.emit('archive_list', all_info);
-        }); 
+        });
       }
     })
   }
@@ -322,7 +322,7 @@ server.backend = function(base_dir, socket_emitter) {
 }
 
 function server_container(server_name, base_dir, socket_io) {
-  // when evoked, creates a permanent 'mc' instance, namespace, and place for file tails. 
+  // when evoked, creates a permanent 'mc' instance, namespace, and place for file tails.
   var self = this;
   var instance = new mineos.mc(server_name, base_dir),
       nsp = socket_io.of('/{0}'.format(server_name)),
@@ -347,9 +347,9 @@ function server_container(server_name, base_dir, socket_io) {
     fw.add('**/eula.txt');
     fw.add('**/server-icon.png');
     fw.add('**/config.yml');
-    
+
     function handle_event(fp) {
-      var FS_DELAY = 250; 
+      var FS_DELAY = 250;
       // because it is unknown when fw triggers on add/change and
       // further because if it catches DURING the write, it will find
       // the file has 0 size, adding arbitrary delay.
@@ -376,7 +376,7 @@ function server_container(server_name, base_dir, socket_io) {
           break;
       }
     }
-    
+
     fw.on('add', handle_event);
     fw.on('change', handle_event);
   })();
@@ -392,7 +392,26 @@ function server_container(server_name, base_dir, socket_io) {
           if (is_unconventional)
             cb(null, {}); //ignore ping--wouldn't respond in any meaningful way
           else
-            instance.property('ping', function(err, ping) { cb(null, err ? {} : ping) }) 
+            instance.property('ping', function(err, ping) { cb(null, err ? {} : ping) })
+        })
+      },
+      'query': function(cb) {
+        instance.property('unconventional', function(err, is_unconventional) {
+          if (is_unconventional)
+            cb(null, {}); //ignore ping--wouldn't respond in any meaningful way
+          else {
+            instance.property('server.properties', function(err, sp) {
+              if (sp['enable-query'].toLowerCase() == 'true' && parseInt(sp['query-port']) > 0) {
+                var mcquery = require('mcquery');
+                var q = new query('localhost', parseInt(sp['query-port']));
+                q.connect(function() {
+                  q.full_stat(cb);
+                })
+              } else {
+                cb(null, {});
+              }
+            })
+          }
         })
       }
     }, function(err, retval) {
@@ -417,7 +436,7 @@ function server_container(server_name, base_dir, socket_io) {
 
       for (var i in required_args) {
         // all callbacks expected to follow the pattern (success, payload).
-        if (required_args[i] == 'callback') 
+        if (required_args[i] == 'callback')
           arg_array.push(function(err, payload) {
             args.success = !err;
             args.err = err;
@@ -558,7 +577,7 @@ function server_container(server_name, base_dir, socket_io) {
     /* makes a file tail relative to the CWD, e.g., /var/games/minecraft/servers/myserver.
        tails are used to get live-event reads on files.
 
-       if the server does not exist, a watch is made in the interim, waiting for its creation.  
+       if the server does not exist, a watch is made in the interim, waiting for its creation.
        once the watch is satisfied, the watch is closed and a tail is finally created.
     */
     var tail = require('tail').Tail;
@@ -580,7 +599,7 @@ function server_container(server_name, base_dir, socket_io) {
     } catch (e) {
       logging.error('[{0}] Create tail on {1} failed'.format(server_name, rel_filepath));
       logging.info('[{0}] Watching for file generation: {1}'.format(server_name, rel_filepath));
-      
+
       var fireworm = require('fireworm');
       var fw = fireworm(instance.env.cwd);
 
@@ -608,13 +627,13 @@ function server_container(server_name, base_dir, socket_io) {
         required_args = introspect(fn);
         // receives an array of all expected arguments, using introspection.
         // they are in order as listed by the function definition, which makes iteration possible.
-      } catch (e) { 
+      } catch (e) {
         args.success = false;
         args.error = e;
         args.time_resolved = Date.now();
         nsp.emit('server_fin', args);
         logging.error('server_fin', args);
-        
+
         while (notices.length > NOTICES_QUEUE_LENGTH)
           notices.shift();
         notices.push(args);
@@ -623,7 +642,7 @@ function server_container(server_name, base_dir, socket_io) {
 
       for (var i in required_args) {
         // all callbacks expected to follow the pattern (success, payload).
-        if (required_args[i] == 'callback') 
+        if (required_args[i] == 'callback')
           arg_array.push(function(err, payload) {
             args.success = !err;
             args.err = err;
@@ -693,7 +712,7 @@ function server_container(server_name, base_dir, socket_io) {
           server_dispatcher(args);
           break;
       }
-      
+
     }
 
     function get_file_contents(rel_filepath) {
@@ -823,7 +842,7 @@ function server_container(server_name, base_dir, socket_io) {
           break;
         case 'start':
           logging.log('[{0}] {1} starting cron: {2}'.format(server_name, ip_address, opts.hash));
-          
+
           async.series([
             async.apply(instance.set_cron, opts.hash, true),
             async.apply(reload_cron)
@@ -895,7 +914,7 @@ function check_profiles(base_dir, callback) {
       releaseTime: null,
       type: null, // release, snapshot, old_version
       group: null, //mojang, ftb, ftb_third_party, pocketmine, etc.
-      webui_desc: null, 
+      webui_desc: null,
       weight: 0,
       downloaded: false,
       filename: null, // minecraft_server.1.8.8.jar
@@ -986,7 +1005,7 @@ function check_profiles(base_dir, callback) {
                   new_item['release_version'] = old_versions[idx];
 
                   if (old_versions[idx].length > 0 && old_versions[idx] != ref_obj['version'])
-                    p.push(new_item);                  
+                    p.push(new_item);
                 }
               }
               callback(err || inner_err, p);
@@ -1049,7 +1068,7 @@ function check_profiles(base_dir, callback) {
                   new_item['release_version'] = old_versions[idx];
 
                   if (old_versions[idx].length > 0 && old_versions[idx] != ref_obj['version'])
-                    p.push(new_item);                  
+                    p.push(new_item);
                 }
               }
               callback(err || inner_err, p);
@@ -1069,7 +1088,7 @@ function check_profiles(base_dir, callback) {
       var p = [];
 
       function handle_reply(err, retval) {
-        for (var r in retval) 
+        for (var r in retval)
           if ((retval[r] || {}).statusCode == 200) {
             var item = new profile_template();
             var ref_obj = JSON.parse(retval[r].body);
@@ -1181,8 +1200,8 @@ function check_profiles(base_dir, callback) {
   var results = {};
 
   async.forEachOfLimit(
-    SOURCES, 
-    LIMIT_SIMULTANEOUS_DOWNLOADS, 
+    SOURCES,
+    LIMIT_SIMULTANEOUS_DOWNLOADS,
     function(dl_func, key, inner_callback) {
       dl_func(function(err, profs) {
         for (var source in profs)
@@ -1190,7 +1209,7 @@ function check_profiles(base_dir, callback) {
 
         inner_callback();
       })
-    }, 
+    },
     function(err) {
       var merged = [];
       for (var source in results)
